@@ -2,6 +2,7 @@ from utils import (
     basic_tokenizer, word2char, count_parameters, translate_sentence,
     save_model, load_model
 )
+from errors import error_df
 from models import Encoder, Decoder, Seq2Seq
 from pipeline import train, evaluate
 from metrics import evaluation_report
@@ -19,6 +20,7 @@ wrn.filterwarnings('ignore')
 
 def main():
     df = pd.read_csv('./Dataset/sec_dataset_II.csv')
+    df_copy = df.copy()
     df['Word'] = df['Word'].apply(word2char)
     df['Error'] = df['Error'].apply(word2char)
     df = df.sample(frac=1).reset_index(drop=True)
@@ -31,6 +33,15 @@ def main():
     train_df.to_csv('./Dataset/train.csv', index=False)
     valid_df.to_csv('./Dataset/valid.csv', index=False)
     test_df.to_csv('./Dataset/test.csv', index=False)
+
+    # ['Cognitive Error', 'Homonym Error', 'Run-on Error',
+    #  'Split-word Error (Left)', 'Split-word Error (Random)',
+    #  'Split-word Error (Right)', 'Split-word Error (both)',
+    #  'Typo (Avro) Substituition', 'Typo (Bijoy) Substituition',
+    #  'Typo Deletion', 'Typo Insertion', 'Typo Transposition',
+    #  'Visual Error', 'Visual Error (Combined Character)']
+    error_name = 'Cognitive Error'
+    error_df(df_copy, error_name)
 
     SRC = Field(
         tokenize=basic_tokenizer, lower=False,
@@ -52,6 +63,13 @@ def main():
         format='csv',
         fields=fields
     )
+    error_data, _ = TabularDataset.splits(
+        path='./Dataset',
+        train='error.csv',
+        test='error.csv',
+        format='csv',
+        fields=fields
+    )
     SRC.build_vocab(train_data, min_freq=100)
     TRG.build_vocab(train_data, min_freq=50)
     # print(len(SRC.vocab), len(TRG.vocab))
@@ -63,7 +81,7 @@ def main():
     INPUT_DIM = len(SRC.vocab)
     OUTPUT_DIM = len(TRG.vocab)
     EMB_DIM = 64  # 64
-    HID_DIM = 128  # 256 # each conv. layer has 2 * hid_dim filters
+    HID_DIM = 64  # 256 # each conv. layer has 2 * hid_dim filters
     ENC_LAYERS = 10  # number of conv. blocks in encoder
     DEC_LAYERS = 10  # number of conv. blocks in decoder
     ENC_KERNEL_SIZE = 3  # must be odd!
@@ -96,7 +114,7 @@ def main():
     if os.path.exists(PATH):
         checkpoint, epoch, train_loss = load_model(model, PATH)
     #
-    N_EPOCHS = epoch + 100
+    N_EPOCHS = epoch + 0
     best_loss = 1e10
 
     for epoch in range(epoch, N_EPOCHS):
@@ -115,7 +133,33 @@ def main():
     # translation, attention = translate_sentence(src, SRC, TRG, model, DEVICE)
     # print(f'predicted trg = {translation}')
 
-    evaluation_report(valid_data, SRC, TRG, model, DEVICE)
+    # evaluation_report(valid_data, SRC, TRG, model, DEVICE)
+    # evaluation_report(error_data, SRC, TRG, model, DEVICE)
+
+
+    # -------------
+    error_types = ['Typo (Avro) Substituition', 'Typo (Bijoy) Substituition',
+     'Typo Deletion', 'Typo Insertion', 'Typo Transposition',
+     'Visual Error', 'Visual Error (Combined Character)']
+    
+    for error_name in error_types:
+        print(f'------\nError Type: {error_name}\n------')
+        error_df(df_copy, error_name)
+
+        error_data, _ = TabularDataset.splits(
+            path='./Dataset',
+            train='error.csv',
+            test='error.csv',
+            format='csv',
+            fields=fields
+        )
+
+        eval_df = evaluation_report(error_data, SRC, TRG, model, DEVICE)
+
+        error_name = error_name.replace(' ', '').replace('(', '').replace(')', '')
+        eval_df.to_csv(f'./Dataframes/convs2s_{error_name}.csv')
+        print('\n\n')
+    # -------------
 
 
 if __name__ == '__main__':

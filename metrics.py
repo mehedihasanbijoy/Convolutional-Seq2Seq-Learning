@@ -8,10 +8,12 @@ import numpy as np
 
 def evaluation_report(test_data, SRC, TRG, model, DEVICE):
     erroneous_words, predicted_words, correct_words, flags = [], [], [], []
+
     modified_flags = []
     all_words = pd.read_csv('./Dataset/allDictWords_df.csv')
     all_words = sorted(all_words.iloc[:, 0].values)
-    for idx, data in enumerate(tqdm(test_data)):
+
+    for data in tqdm(test_data):
         src = data.src
         trg = data.trg
         translation, attention = translate_sentence(src, SRC, TRG, model, DEVICE)
@@ -67,7 +69,8 @@ def evaluation_report(test_data, SRC, TRG, model, DEVICE):
         Modified Accuracy: {MODIFIED_ACC * 100:.2f}%
     ''')
 
-    evaluation_df.to_csv('./Dataset/preds_convs2s.csv', index=False)
+    # evaluation_df.to_csv('./Dataset/preds_convs2s.csv', index=False)
+    return evaluation_df
 
 
 if __name__ == '__main__':
